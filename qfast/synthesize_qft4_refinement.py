@@ -1,4 +1,4 @@
-from decomposition import *
+from decomposition_distribution import *
 import pickle
 
 file_in = open('pickle_in.p', 'rb')
@@ -12,6 +12,7 @@ in_['params["refinement_learning_rate"]'])
 
 print("Our result:")
 print(fun_vals)
+
 
 file_out = open('pickle_out.p', 'rb')
 out_ = pickle.load(file_out)
