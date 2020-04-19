@@ -14,6 +14,8 @@ from block import Block
 from metrics import hilbert_schmidt_distance
 from pauli import get_unitary_from_pauli_coefs, reset_tensor_cache
 
+import pickle
+
 
 logger = logging.getLogger( "qfast" )
 
@@ -79,13 +81,17 @@ def decomposition ( block, **kwargs ):
 
     loc_fixed = lm.fix_locations( loc_vals )
 
+    pickle_in = {'block.utry': block.utry, 'block.num_qubits': block.num_qubits, 'gate_size': gate_size, 'fun_vals': fun_vals, 'loc_fixed': loc_fixed, 'params["refinement_distance"]': params["refinement_distance"], 'params["refinement_learning_rate"]': params["refinement_learning_rate"]}
+
+    pickle.dump(pickle_in, open('pickle_in.p', 'wb'))
     fun_vals = refinement( block.utry, block.num_qubits, gate_size,
                            fun_vals, loc_fixed,
                            params["refinement_distance"],
                            params["refinement_learning_rate"] )
+    pickle_out = {'fun_vals': fun_vals}
+    pickle.dump(pickle_out, open('pickle_out.p', 'wb'))
 
     return convert_to_block_list( block.get_location(), fun_vals, loc_fixed )
-
 
 def get_decomposition_size ( num_qubits ):
     """
