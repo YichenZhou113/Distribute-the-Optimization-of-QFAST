@@ -7,12 +7,12 @@ import tensorflow as tf
 import numpy      as np
 import itertools  as it
 
-from .fixedgate import FixedGate
-from .genericgate import GenericGate
-from .locationmodel import LocationModel
-from .block import Block
-from .metrics import hilbert_schmidt_distance
-from .pauli import get_unitary_from_pauli_coefs, reset_tensor_cache
+from fixedgate import FixedGate
+from genericgate import GenericGate
+from locationmodel import LocationModel
+from block import Block
+from metrics import hilbert_schmidt_distance
+from pauli import get_unitary_from_pauli_coefs, reset_tensor_cache
 
 
 logger = logging.getLogger( "qfast" )

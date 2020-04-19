@@ -8,8 +8,8 @@ import tensorflow   as tf
 import numpy        as np
 import scipy.linalg as la
 
-from .pauli import get_pauli_n_qubit_projection
-from .pauli import get_pauli_tensor_n_qubit_projection
+from pauli import get_pauli_n_qubit_projection
+from pauli import get_pauli_tensor_n_qubit_projection
 
 
 class FixedGate():
