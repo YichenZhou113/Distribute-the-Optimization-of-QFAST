@@ -15,6 +15,7 @@ from metrics import hilbert_schmidt_distance
 from pauli import get_unitary_from_pauli_coefs, reset_tensor_cache
 
 import pickle
+import sys
 
 
 logger = logging.getLogger( "qfast" )
@@ -303,12 +304,19 @@ def refinement ( target, num_qubits, gate_size, fun_vals, loc_fixed,
 
     tf.reset_default_graph()
     reset_tensor_cache()
-
+    
+    #can read the arguments like this. python3 synthesize_qft4_refinement.py -n 1
+    print("All arguments")
+    print(sys.argv) # synthesize_qft4_refinement.py -n 1
+    print("-n arguments")
+    print(sys.argv[-1]) # 1
+    
     layers = [ FixedGate( "Gate%d" % i, num_qubits, gate_size,
                           loc = loc_fixed[i], fun_vals = fun_vals[i] )
                for i in range( len( fun_vals ) ) ]
 
     tensor = layers[0].get_tensor()
+    
     for layer in layers[1:]:
         tensor = tf.matmul( layer.get_tensor(), tensor )
 
