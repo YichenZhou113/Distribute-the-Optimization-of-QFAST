@@ -3,10 +3,14 @@ Example showing how to synthesize a 4-qubit QFT program using QFAST.
 """
 
 import numpy as np
-
+import logging
 from circuit import *
 from instantiation import *
 from recombination import *
+
+logging.basicConfig(filename='qfast_fixed_step.log', level=logging.DEBUG)
+logging.warning('Start!') #testing
+logger = logging.getLogger( "qfast" )
 
 # The 4-qubit QFT unitary matrix.
 qft4 = np.array(

@@ -1,5 +1,10 @@
-from decomposition_distribution import *
+from decomposition import *
 import pickle
+import logging
+
+logging.basicConfig(filename='qfastlog.log', level=logging.DEBUG)
+logging.warning('Watch out!') #testing
+logger = logging.getLogger( "qfast" )
 
 file_in = open('pickle_in.p', 'rb')
 in_ = pickle.load(file_in)
