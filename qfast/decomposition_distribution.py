@@ -16,10 +16,24 @@ from pauli import get_unitary_from_pauli_coefs, reset_tensor_cache
 
 import pickle
 import sys
-
+import os
+from hostlist import expand_hostlist
 
 logger = logging.getLogger( "qfast" )
 
+#task_index  = int( os.environ['SLURM_PROCID'] )
+#print("task_index: ", task_index)
+#n_tasks     = int( os.environ['SLURM_NPROCS'] )
+#print("n_tasks: ", n_tasks)
+#tf_hostlist = [ ("%s:22222" % host) for host in
+#                expand_hostlist( os.environ['SLURM_NODELIST']) ]
+#print("tf_hostlist, ", tf_hostlist)
+#
+#cluster = tf.train.ClusterSpec( {"qfast" : tf_hostlist } )
+#server  = tf.train.Server( cluster.as_cluster_def(),
+#                           job_name   = "qfast",
+#                           task_index = task_index )
+#n_cpus = n_tasks
 
 def decomposition ( block, **kwargs ):
     """
@@ -67,7 +81,10 @@ def decomposition ( block, **kwargs ):
     if block.num_qubits <= params["native_block_size"]:
         return [ block ]
 
-    gate_size = get_decomposition_size( block.num_qubits )
+    gate_size = get_decomposition_size( block.num_qubits ) #calculate
+    # qft4: 4 qubits in/out, change states
+    # gate_size: 2 qubit operations, each operation is applied to 2 qubits out of 4
+    
 
     if gate_size < params["native_block_size"]:
         gate_size = params["native_block_size"]
@@ -301,16 +318,27 @@ def refinement ( target, num_qubits, gate_size, fun_vals, loc_fixed,
     Returns:
         (List[List[float]]): Refined gate function values
     """
+#    #can read the arguments like this. python3 synthesize_qft4_refinement.py -n 1
+#    print("All arguments")
+#    print(sys.argv) # synthesize_qft4_refinement.py -n 1
+#    print("-n arguments")
+#    print(sys.argv[-1]) # 1
+##    n_cpus = sys.argv[-1];
+    
 
     tf.reset_default_graph()
     reset_tensor_cache()
+
+    with tf.device("/job:localhost/replica:0/task:0/device:CPU:0"):
+        layers = FixedGate( "Gate%d" % 0, num_qubits, gate_size, loc = loc_fixed[0], fun_vals = fun_vals[0] )
+        tensor = layers.get_tensor()
     
-    #can read the arguments like this. python3 synthesize_qft4_refinement.py -n 1
-    print("All arguments")
-    print(sys.argv) # synthesize_qft4_refinement.py -n 1
-    print("-n arguments")
-    print(sys.argv[-1]) # 1
+    for i in range(1, len(fun_vals)):
+        with tf.device("/job:localhost/replica:0/task:%d/device:CPU:0" % (i % n_cpus)):
+            layers = FixedGate( "Gate%d" % i, num_qubits, gate_size, loc = loc_fixed[i], fun_vals = fun_vals[i] )
+            tensor = tf.matmul(layers.get_tensor(), tensor)
     
+    """
     layers = [ FixedGate( "Gate%d" % i, num_qubits, gate_size,
                           loc = loc_fixed[i], fun_vals = fun_vals[i] )
                for i in range( len( fun_vals ) ) ]
@@ -319,22 +347,31 @@ def refinement ( target, num_qubits, gate_size, fun_vals, loc_fixed,
     
     for layer in layers[1:]:
         tensor = tf.matmul( layer.get_tensor(), tensor )
-
-    loss_fn   = hilbert_schmidt_distance( target, tensor )
-    optimizer = tf.train.AdamOptimizer( learning_rate )
-    train_op  = optimizer.minimize( loss_fn )
-    init_op   = tf.global_variables_initializer()
+    """
+    with tf.device(tf.train.replica_device_setter(ps_tasks = n_cpus)):
+        loss_fn   = hilbert_schmidt_distance( target, tensor )
+        optimizer = tf.train.AdamOptimizer( learning_rate )
+        train_op  = optimizer.minimize( loss_fn )
+        init_op   = tf.global_variables_initializer()
 
     loss_values = []
+    
+    run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
+    run_metadata = tf.RunMetadata()
 
-    with tf.Session() as sess:
-        sess.run( init_op )
-        loss = sess.run( loss_fn )
+    with tf.Session(config=tf.ConfigProto(
+        device_count={ "CPU": n_cpus },
+        inter_op_parallelism_threads=n_cpus,
+        intra_op_parallelism_threads=1,
+    )) as sess:
+        #writer = tf.summary.FileWriter('./graphs', sess.graph) #visualize tensorflow graph
+        sess.run( init_op, options=run_options, run_metadata=run_metadata )
+        loss = sess.run( loss_fn, options=run_options, run_metadata=run_metadata )
         logger.info( "Starting refinement at %f distance." % loss )
 
         for i in range( 10000 ):
             for j in range( 50 ):
-                loss = sess.run( [ train_op, loss_fn ] )[1]
+                loss = sess.run( [ train_op, loss_fn ], options=run_options, run_metadata=run_metadata )[1]
 
             if loss < refinement_distance:
                 break
@@ -359,7 +396,13 @@ def refinement ( target, num_qubits, gate_size, fun_vals, loc_fixed,
                     break
 
         logger.info( "Ending refinement at %f distance." % loss )
-
+        
+        for device in run_metadata.step_stats.dev_stats:
+            device_name = device.device
+            print(device.device)
+            for node in device.node_stats:
+                print("   ", node.node_name)
+            
         return [ l.get_fun_vals( sess ) for l in layers ]
 
 
